@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Red de Tesistas — Dr. Víctor A. Ramos</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --azul: #185FA5; --verde: #1D9E75; --violeta: #7F77DD;
+    --naranja: #D85A30; --amarillo: #EF9F27;
+    --bg: #f8f7f4; --card: #ffffff; --border: #e5e3dc;
+    --text: #1a1a18; --muted: #73726c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+  
+  /* HEADER */
+  .header { background: var(--azul); color: white; padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header p { font-size: 12px; opacity: .8; margin-top: 2px; }
+  .logo { width: 44px; height: 44px; background: rgba(255,255,255,.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+
+  /* NAV TABS */
+  .tabs { background: white; border-bottom: 1px solid var(--border); display: flex; overflow-x: auto; }
+  .tab { padding: 14px 20px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; color: var(--muted); }
+  .tab.active { border-bottom-color: var(--azul); color: var(--azul); font-weight: 500; }
+
+  /* CONTENIDO */
+  .content { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
+  .section { display: none; } .section.active { display: block; }
+
+  /* STATS */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .stat { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+  .stat-n { font-size: 22px; font-weight: 600; }
+  .stat-l { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* MAPA */
+  #map { width: 100%; height: 560px; border-radius: 10px; border: 1px solid var(--border); }
+
+  /* ÁRBOL */
+  .tree-cols { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
+  .tree-col { flex: 1; min-width: 220px; max-width: 300px; }
+  .tree-col-header { font-size: 12px; font-weight: 600; padding: 6px 0; border-bottom: 2px solid var(--border); margin-bottom: 10px; }
+  .decade { margin-bottom: 14px; }
+  .decade-label { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
+  .tcard { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+  .tcard:hover { border-color: var(--azul); box-shadow: 0 2px 8px rgba(24,95,165,.1); }
+  .tcard.en-curso { border-left: 3px solid var(--amarillo); }
+  .tcard-name { font-size: 13px; font-weight: 500; }
+  .tcard-tema { font-size: 11px; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tcard-meta { font-size: 10px; color: #aaa; margin-top: 3px; }
+
+  /* LISTA */
+  .search-box { margin-bottom: 14px; }
+  .search-box input { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 13px; outline: none; }
+  .search-box input:focus { border-color: var(--azul); }
+  .list-row { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); gap: 10px; }
+  .list-info { flex: 1; min-width: 0; }
+  .list-name { font-size: 13px; font-weight: 500; }
+  .list-tema { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-meta { font-size: 10px; color: #aaa; }
+
+  /* CAMPAÑAS */
+  .campana-card { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 14px; cursor: pointer; transition: box-shadow .15s; }
+  .campana-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+  .campana-header { display: flex; align-items: flex-start; gap: 12px; }
+  .campana-year { background: var(--azul); color: white; border-radius: 6px; padding: 4px 10px; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+  .campana-title { font-size: 14px; font-weight: 500; }
+  .campana-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .campana-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .fotos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 12px; }
+  .foto-thumb { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 6px; cursor: pointer; }
+
+  /* BADGES */
+  .badge { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+  .bd { background: #E6F1FB; color: #185FA5; }
+  .bl { background: #E1F5EE; color: #0F6E56; }
+  .bp { background: #EEEDFE; color: #534AB7; }
+  .bm { background: #FAECE7; color: #993C1D; }
+  .bc { background: #FAEEDA; color: #854F0B; }
+
+  /* BOTONES */
+  button { cursor: pointer; }
+  .btn-primary { background: var(--azul); color: white; border: none; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 500; }
+  .btn-primary:hover { background: #0C447C; }
+  .btn-sec { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 8px 16px; font-size: 12px; }
+  .btn-sec:hover { background: var(--bg); }
+  .btn-danger { background: transparent; color: #A32D2D; border: 1px solid #F09595; border-radius: 6px; padding: 4px 10px; font-size: 11px; }
+  .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .fbtn { padding: 5px 13px; border-radius: 20px; border: 1px solid var(--border); font-size: 11px; background: white; color: var(--muted); }
+  .fbtn.on { background: var(--azul); color: white; border-color: var(--azul); }
+  .map-controls { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+  .layer-btn { margin-left: auto; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); font-size: 12px; background: #2C2C2A; color: white; }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 1000; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: white; border-radius: 12px; padding: 24px; width: 100%; max-width: 520px; }
+  .modal-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; flex-shrink: 0; }
+  .modal table { width: 100%; font-size: 13px; border-collapse: collapse; }
+  .modal td { padding: 6px 0; vertical-align: top; }
+  .modal td:first-child { color: var(--muted); width: 110px; }
+  .anecdota { background: #FFF9EE; border-left: 3px solid var(--amarillo); border-radius: 0 8px 8px 0; padding: 12px 14px; font-size: 12px; color: var(--muted); margin-top: 14px; font-style: italic; line-height: 1.6; }
+  .close-btn { margin-left: auto; background: none; border: none; font-size: 22px; color: var(--muted); cursor: pointer; }
+
+  /* FORMULARIOS */
+  .form-section { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 20px 22px; max-width: 520px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 13px; outline: none; background: white;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--azul); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pin-gate { margin-bottom: 16px; }
+
+  /* UPLOAD FOTO */
+  .upload-area { border: 2px dashed var(--border); border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; color: var(--muted); font-size: 13px; }
+  .upload-area:hover { border-color: var(--azul); color: var(--azul); }
+  
+  /* LIGHTBOX */
+  .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 2000; align-items: center; justify-content: center; }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 90vw; max-height: 88vh; border-radius: 6px; object-fit: contain; }
+  .lightbox-close { position: absolute; top: 16px; right: 20px; color: white; font-size: 28px; cursor: pointer; background: none; border: none; }
+  .lightbox-caption { position: absolute; bottom: 20px; color: white; font-size: 13px; text-align: center; width: 100%; }
+
+  /* MISC */
+  .root-card { background: white; border: 2px solid var(--azul); border-radius: 12px; padding: 14px 20px; text-align: center; display: inline-block; margin-bottom: 4px; }
+  .connector { width: 1px; height: 20px; background: var(--border); margin: 0 auto; }
+  .empty { color: var(--muted); font-size: 13px; padding: 24px 0; text-align: center; }
+  .loading { color: var(--muted); font-size: 13px; padding: 16px 0; }
+  .msg-ok { color: #0F6E56; font-size: 12px; margin-top: 8px; }
+  .msg-err { color: #A32D2D; font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">⛰</div>
+  <div>
+    <h1>Red de Tesistas — Dr. Víctor Alberto Ramos</h1>
+    <p>Laboratorio de Tectónica Andina · UBA / CONICET · Desde 1984</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('mapa')">Mapa GPS</div>
+  <div class="tab" onclick="showTab('red')">Red de tesistas</div>
+  <div class="tab" onclick="showTab('campanas')">Campañas</div>
+  <div class="tab" onclick="showTab('lista')">Lista completa</div>
+
+  <div class="tab" onclick="showTab('miperfil')">Mi perfil</div>
+  <div class="tab" onclick="showTab('admin')">Admin</div>
+</div>
+
+<div class="content">
+
+<!-- MAPA -->
+<div id="sec-mapa" class="section active">
+  <div class="stats" id="stats"></div>
+  <div class="map-controls">
+    <div class="filter-bar" style="margin:0">
+      <button class="fbtn on" onclick="fmap('todos',this)">Todos</button>
+      <button class="fbtn" onclick="fmap('Doctorado',this)">Doctorado</button>
+      <button class="fbtn" onclick="fmap('Licenciatura',this)">Licenciatura</button>
+      <button class="fbtn" onclick="fmap('Posdoctorado',this)">Posdoctorado</button>
+      <button class="fbtn" onclick="fmap('Master',this)">Master</button>
+      <button class="fbtn" onclick="fmap('campanas',this)">Campañas</button>
+    </div>
+    <button class="layer-btn" id="layer-btn" onclick="toggleLayer()">Callejero</button>
+  </div>
+  <div style="margin-bottom:8px">
+    <input id="mapa-search" placeholder="Buscar tesista, campaña o zona…"
+      oninput="buscarEnMapa(this.value)"
+      style="width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 14px;font-size:13px;outline:none;background:white">
+    <div id="mapa-search-results" style="position:relative"></div>
+  </div>
+  <div id="map"></div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:11px;color:var(--muted)">
+    <span>● Doctorado</span><span style="color:#1D9E75">● Licenciatura</span>
+    <span style="color:#7F77DD">● Posdoctorado</span><span style="color:#D85A30">● Master</span>
+    <span style="color:#EF9F27">★ Campaña de campo</span>
+    <span style="margin-left:auto">© Esri · © OpenStreetMap</span>
+  </div>
+</div>
+
+<!-- ÁRBOL -->
+<div id="sec-red" class="section">
+  <div class="search-box" style="margin-bottom:14px">
+    <input id="red-search" placeholder="Buscar por nombre, tema, institución…" oninput="renderArbol()">
+  </div>
+  <div style="text-align:center;margin-bottom:4px">
+    <div class="root-card">
+      <div style="font-size:15px;font-weight:600">Dr. Víctor Alberto Ramos</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px">UBA / CONICET · Lab. Tectónica Andina (1984–)</div>
+    </div>
+  </div>
+  <div class="connector"></div>
+  <div class="tree-cols" id="tree-cols"></div>
+</div>
+
+<!-- CAMPAÑAS -->
+<div id="sec-campanas" class="section">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h2 style="font-size:16px;font-weight:500">Campañas</h2>
+    <button class="btn-primary" onclick="abrirNuevaCampana()" id="btn-nueva-campana" style="display:none">+ Nueva campaña</button>
+  </div>
+  <div class="search-box" style="margin-bottom:14px">
+    <input id="campanas-search" placeholder="Buscar por nombre, zona, año, participante…" oninput="renderCampanas()">
+  </div>
+  <div id="campanas-lista"><p class="loading">Cargando campañas...</p></div>
+</div>
+
+<!-- LISTA -->
+<div id="sec-lista" class="section">
+  <div class="search-box"><input id="search" placeholder="Buscar por nombre, tema, año, institución..." oninput="renderLista()"></div>
+  <div class="filter-bar">
+    <button class="fbtn on" onclick="flista('todos',this)">Todos</button>
+    <button class="fbtn" onclick="flista('Doctorado',this)">Doctorado</button>
+    <button class="fbtn" onclick="flista('Licenciatura',this)">Licenciatura</button>
+    <button class="fbtn" onclick="flista('Posdoctorado',this)">Posdoctorado</button>
+    <button class="fbtn" onclick="flista('Master',this)">Master</button>
+    <button class="fbtn" onclick="flista('En curso',this)">En curso</button>
+  </div>
+  <div id="lista-cont"></div>
+</div>
+
+<!-- MI PERFIL -->
+<div id="sec-miperfil" class="section">
+  <div style="max-width:560px">
+    <!-- LOGIN -->
+    <div id="perfil-login" class="form-section" style="margin-bottom:16px">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Ingresá tu nombre y código para acceder a tu perfil y actualizar tus datos.</p>
+      <p style="font-size:12px;color:var(--muted);background:#F5F4F1;border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:16px">
+        ¿Querés agregar o actualizar datos en esta base? Contactate con
+        <a href="mailto:maitunik@gmail.com" style="color:var(--azul);font-weight:500">maitunik@gmail.com</a>
+      </p>
+      <div class="form-group"><label>Tu nombre completo</label><input id="perfil-nombre" placeholder="Ej: Laura Giambiagi"></div>
+      <div class="form-group"><label>Código de acceso</label><input id="perfil-codigo" type="password"></div>
+      <button class="btn-primary" onclick="perfilVerificar()">Ingresar</button>
+      <p id="perfil-login-msg" style="font-size:12px;margin-top:8px"></p>
+    </div>
+
+    <!-- PANEL PERSONAL (oculto hasta verificar) -->
+    <div id="perfil-panel" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="font-size:15px;font-weight:600" id="perfil-bienvenida"></div>
+          <div style="font-size:12px;color:var(--muted)" id="perfil-nivel"></div>
+        </div>
+        <button class="btn-sec" style="font-size:11px" onclick="perfilCerrar()">Cerrar sesión</button>
+      </div>
+
+      <!-- DATOS PERSONALES -->
+      <div class="form-section" style="margin-bottom:16px">
+        <p style="font-size:13px;font-weight:500;margin-bottom:14px">Mis datos actuales</p>
+        <div class="form-group"><label>Institución actual</label><input id="perfil-inst"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group"><label>Provincia actual</label>
+            <select id="perfil-prov"><option value="">—</option>
+              <option>Buenos Aires</option><option>CABA</option><option>Chubut</option>
+              <option>Córdoba</option><option>Jujuy</option><option>Mendoza</option>
+              <option>Neuquén</option><option>Río Negro</option><option>Salta</option>
+              <option>San Juan</option><option>San Luis</option><option>Santa Cruz</option>
+              <option>Santa Fe</option><option>Tierra del Fuego</option><option>Tucumán</option>
+              <option>Extranjero</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Posición actual</label><input id="perfil-posicion"></div>
+        </div>
+        <div class="form-group"><label>Email de contacto (opcional)</label><input id="perfil-email" type="email"></div>
+        <button class="btn-primary" onclick="perfilGuardarDatos()">Guardar datos</button>
+        <p id="perfil-datos-msg" style="font-size:12px;margin-top:8px"></p>
+      </div>
+
+      <!-- TESIS -->
+      <div class="form-section" style="margin-bottom:16px">
+        <p style="font-size:13px;font-weight:500;margin-bottom:14px">Mi tesis</p>
+        <div class="form-group">
+          <label>Link a la tesis (repositorio UBA u otro)</label>
+          <input id="perfil-url-tesis" placeholder="https://bibliotecadigital.exactas.uba.ar/...">
+        </div>
+        <div class="form-group">
+          <label>O subir PDF de la tesis</label>
+          <input type="file" id="perfil-pdf" accept=".pdf" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;width:100%;background:white;margin:0">
+        </div>
+        <button class="btn-primary" onclick="perfilGuardarTesis()">Guardar tesis</button>
+        <p id="perfil-tesis-msg" style="font-size:12px;margin-top:8px"></p>
+      </div>
+
+      <!-- CAMPAÑAS -->
+      <div class="form-section">
+        <p style="font-size:13px;font-weight:500;margin-bottom:4px">Mis campañas</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Campañas en las que participaste. Podés agregar fotos o corregir información.</p>
+        <div id="perfil-campanas-lista"></div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+          <p style="font-size:12px;font-weight:500;margin-bottom:8px">¿Participaste en una campaña que no figura?</p>
+          <div style="display:flex;gap:8px">
+            <select id="perfil-agregar-campana" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;outline:none;background:white;margin:0">
+              <option value="">— Seleccionar campaña —</option>
+            </select>
+            <button class="btn-primary" style="font-size:12px;padding:8px 14px" onclick="perfilAgregarCampana()">Agregar</button>
+          </div>
+          <p id="perfil-camp-msg" style="font-size:12px;margin-top:8px"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="sec-admin" class="section">
+  <div class="form-section" style="max-width:600px">
+    <div class="pin-gate" id="pin-gate">
+      <div class="form-group"><label>PIN de administrador</label><input id="adm-pin" type="password" placeholder="PIN"></div>
+      <button class="btn-primary" onclick="checkPin()">Ingresar</button>
+    </div>
+    <div id="adm-panel" style="display:none">
+      <h3 style="font-size:14px;font-weight:500;margin-bottom:14px">Agregar / editar tesista</h3>
+      <div class="form-row">
+        <div class="form-group"><label>Nombre</label><input id="adm-nombre"></div>
+        <div class="form-group"><label>Nivel</label>
+          <select id="adm-nivel"><option>Doctorado</option><option>Licenciatura</option><option>Posdoctorado</option><option>Master</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label>Tema de tesis</label><input id="adm-tema"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Institución</label><input id="adm-inst"></div>
+        <div class="form-group"><label>Período</label><input id="adm-periodo" placeholder="ej: 1989-1994"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Año</label><input id="adm-anio" type="number"></div>
+        <div class="form-group"><label>Estado</label>
+          <select id="adm-estado"><option>Completada</option><option>En curso</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Latitud (zona de tesis)</label><input id="adm-lat" type="number" step="0.001"></div>
+        <div class="form-group"><label>Longitud</label><input id="adm-lng" type="number" step="0.001"></div>
+      </div>
+      <div class="form-group"><label>Anécdota / nota biográfica</label><textarea id="adm-anecdota" rows="3"></textarea></div>
+      <div class="form-group"><label>Código de acceso</label><input id="adm-codigo"></div>
+      <input type="hidden" id="adm-id">
+      <div style="display:flex;gap:10px">
+        <button class="btn-primary" onclick="admGuardar()">Guardar</button>
+        <button class="btn-sec" onclick="admLimpiar()">Nuevo</button>
+      </div>
+      <p id="adm-msg"></p>
+      <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+      <div id="adm-lista"></div>
+
+      <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+      <div>
+        <h3 style="font-size:14px;font-weight:500;margin-bottom:6px">Ubicar campañas en el mapa</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Seleccioná una campaña de la lista y hacé clic en el mapa para asignarle coordenadas. Las campañas sin ubicación aparecen en rojo.</p>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div style="flex:0 0 220px;min-width:180px;max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:8px" id="ubicar-lista"></div>
+          <div style="flex:1;min-width:280px">
+            <div id="ubicar-map" style="width:100%;height:420px;border-radius:8px;border:1px solid var(--border);cursor:crosshair"></div>
+            <div id="ubicar-info" style="font-size:12px;color:var(--muted);margin-top:8px;min-height:20px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /content -->
+
+<!-- MODAL TESISTA -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)cerrarModal()">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<!-- MODAL CAMPAÑA -->
+<div class="modal-overlay" id="modal-campana" onclick="if(event.target===this)cerrarModalCampana()">
+  <div class="modal" id="modal-campana-content" style="max-width:600px"></div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="cerrarLightbox()">
+  <button class="lightbox-close" onclick="cerrarLightbox()">×</button>
+  <img id="lightbox-img" src="">
+  <div class="lightbox-caption" id="lightbox-cap"></div>
+</div>
+
+<script>
+const SURL = 'https://lzyxulwdfgobhdlgqcrv.supabase.co';
+const SKEY = 'sb_publishable_hg58UthYw8A-TAZ-w3hJvA_EzNkmKVl';
+const ADMIN_PIN = '1945';
+
+const { createClient } = supabase;
+const db = createClient(SURL, SKEY);
+
+const NCOL = {
+  Doctorado:   {f:'#4A9EE8',s:'#1A6BBF'},
+  Licenciatura:{f:'#3DD68C',s:'#1A9E60'},
+  Posdoctorado:{f:'#B39DFF',s:'#7C5CBF'},
+  Master:      {f:'#FF8C5A',s:'#CC5522'},
+};
+
+let tesistas=[], campanas=[], admLoggedIn=false;
+let leafMap, satLayer, streetLayer, markersLayer, isSat=true, mapaFiltro='todos';
+let listaFiltro='todos';
+
+// ============ INIT ============
+async function init(){
+  await cargarTesistas();
+  await cargarCampanas();
+  iniciarMapa();
+  renderStats();
+  renderArbol();
+  renderLista();
+  renderCampanas();
+}
+
+async function cargarTesistas(){
+  const {data,error} = await db.from('tesistas').select('*').order('anio');
+  if(!error) tesistas = data || [];
+}
+
+async function cargarCampanas(){
+  const {data,error} = await db.from('campanas').select(`
+    *, campana_tesistas(tesista_id, rol, tesistas(nombre, nivel)),
+    campana_fotos(id, url, caption, orden),
+    campana_externos(externo_id, participantes_externos(id, nombre, rol, institucion))
+  `).order('anio');
+  if(!error) campanas = data || [];
+}
+
+// ============ MAPA ============
+function iniciarMapa(){
+  leafMap = L.map('map',{center:[-35,-67],zoom:4});
+  satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    {attribution:'© Esri',maxZoom:18}).addTo(leafMap);
+  streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {attribution:'© OpenStreetMap',maxZoom:18});
+  markersLayer = L.layerGroup().addTo(leafMap);
+  renderMapa();
+}
+
+function toggleLayer(){
+  const btn=document.getElementById('layer-btn');
+  if(isSat){leafMap.removeLayer(satLayer);streetLayer.addTo(leafMap);btn.textContent='Satélite';btn.style.background='#444';isSat=false;}
+  else{leafMap.removeLayer(streetLayer);satLayer.addTo(leafMap);btn.textContent='Callejero';btn.style.background='#2C2C2A';isSat=true;}
+}
+
+function fmap(v,btn){
+  mapaFiltro=v;
+  document.querySelectorAll('.map-controls .fbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  renderMapa();
+}
+
+function renderMapa(){
+  markersLayer.clearLayers();
+  
+  // Óvalos y marcadores de campañas
+  if(mapaFiltro==='todos'||mapaFiltro==='campanas'){
+    campanas.forEach(c=>{
+      const parts = c.campana_tesistas||[];
+      
+      // Marcador central (triángulo naranja) — solo si tiene coords
+      if(c.lat && c.lng){
+        const sz=36;
+        const yr=c.anio?String(c.anio).slice(-2):'?';
+        const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}">
+          <polygon points="${sz/2},2 ${sz-2},${sz-3} 2,${sz-3}" fill="#EF9F27" stroke="#BA7517" stroke-width="1.5"/>
+          <text x="${sz/2}" y="${sz-8}" text-anchor="middle" font-size="11" fill="white" font-weight="700" font-family="Arial">${yr}</text>
+        </svg>`;
+        const icon=L.divIcon({html:svg,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz-2]});
+        L.marker([c.lat,c.lng],{icon})
+          .bindPopup(`<b style="font-size:13px">${c.nombre||'Campaña '+c.anio}</b><br>
+            <span style="font-size:11px;color:#666">${c.zona||''} · ${c.anio||''}</span><br>
+            <span style="font-size:11px">${parts.length} participante${parts.length!==1?'s':''}</span><br><br>
+            <button onclick="showTab('campanas');setTimeout(()=>abrirCampana('${c.id}'),200)" 
+              style="background:#185FA5;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;font-weight:500">
+              Ver campaña completa →
+            </button>`)
+          .addTo(markersLayer);
+      }
+    });
+  }
+
+  // Puntos de tesistas
+  if(mapaFiltro!=='campanas'){
+    const filt = mapaFiltro==='todos' ? tesistas : tesistas.filter(t=>t.nivel===mapaFiltro);
+    const validos = filt.filter(t=>t.lat&&t.lng);
+    const grupos=[], vis=new Set();
+    validos.forEach((t,i)=>{
+      if(vis.has(i)) return;
+      const g=[t];vis.add(i);
+      validos.forEach((t2,j)=>{
+        if(i===j||vis.has(j)) return;
+        if(Math.hypot(t.lat-t2.lat,t.lng-t2.lng)<0.18){g.push(t2);vis.add(j);}
+      });
+      grupos.push(g);
+    });
+    grupos.forEach(g=>{
+      const lat=g.reduce((s,t)=>s+t.lat,0)/g.length;
+      const lng=g.reduce((s,t)=>s+t.lng,0)/g.length;
+      const n=g.length, rep=g[0];
+      const enCurso=g.some(t=>t.estado==='En curso');
+      const c=enCurso?{f:'#FFD166',s:'#EF9F27'}:(NCOL[rep.nivel]||{f:'#888',s:'#555'});
+      const r=Math.min(8+n*2,20), sz=r*2+6;
+      const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}">
+        <circle cx="${r+3}" cy="${r+3}" r="${r}" fill="${c.f}" fill-opacity=".88" stroke="${c.s}" stroke-width="2"/>
+        ${n>1?`<text x="${r+3}" y="${r+7}" text-anchor="middle" font-size="${n>9?9:11}" font-weight="700" fill="white" font-family="Arial" stroke="#0003" stroke-width="3" paint-order="stroke">${n}</text>`:''}
+      </svg>`;
+      const icon=L.divIcon({html:svg,className:'',iconSize:[sz,sz],iconAnchor:[r+3,r+3]});
+      const rows=g.map(t=>`<div style="padding:5px 0;border-bottom:1px solid #eee">
+        <b style="font-size:12px">${t.nombre}</b>
+        <div style="font-size:11px;color:#555;margin:2px 0">${t.tema||''}</div>
+        <div style="font-size:10px;color:#999">${t.nivel} · ${t.inst||''} · ${t.periodo||t.anio||'en curso'}</div>
+      </div>`).join('');
+      L.marker([lat,lng],{icon})
+        .bindPopup(`<div style="max-height:240px;overflow-y:auto">${n>1?`<b style="font-size:12px">${n} tesis en esta zona</b><div style="margin-bottom:4px"></div>`:''}${rows}</div>`,{maxWidth:300})
+        .addTo(markersLayer);
+    });
+  }
+}
+
+// ============ STATS ============
+function renderStats(){
+  const d=tesistas.filter(t=>t.nivel==='Doctorado'&&t.estado==='Completada').length;
+  const l=tesistas.filter(t=>t.nivel==='Licenciatura').length;
+  const p=tesistas.filter(t=>t.nivel==='Posdoctorado').length;
+  const m=tesistas.filter(t=>t.nivel==='Master').length;
+  const c=tesistas.filter(t=>t.estado==='En curso').length;
+  document.getElementById('stats').innerHTML=`
+    <div class="stat"><div class="stat-n">${tesistas.length}</div><div class="stat-l">Total</div></div>
+    <div class="stat"><div class="stat-n" style="color:#185FA5">${d}</div><div class="stat-l">Doctorales</div></div>
+    <div class="stat"><div class="stat-n" style="color:#1D9E75">${l}</div><div class="stat-l">Licenciatura</div></div>
+    <div class="stat"><div class="stat-n" style="color:#7F77DD">${p}</div><div class="stat-l">Posdoctorado</div></div>
+    <div class="stat"><div class="stat-n" style="color:#D85A30">${m}</div><div class="stat-l">Master</div></div>
+    <div class="stat"><div class="stat-n" style="color:#EF9F27">${campanas.length}</div><div class="stat-l">Campañas</div></div>
+  `;
+}
+
+// ============ ÁRBOL ============
+function renderArbol(){
+  const q=(document.getElementById('red-search')||{}).value||'';
+  const cols=document.getElementById('tree-cols');
+  const grupos={Doctorado:[],Licenciatura:[],Posdoctorado:[],Master:[]};
+  const filtered = q ? tesistas.filter(t=>[t.nombre,t.tema,t.inst,String(t.anio||'')].some(v=>v&&v.toLowerCase().includes(q.toLowerCase()))) : tesistas;
+  filtered.forEach(t=>{if(grupos[t.nivel])grupos[t.nivel].push(t);});
+  const colores={Doctorado:'#185FA5',Licenciatura:'#1D9E75',Posdoctorado:'#7F77DD',Master:'#D85A30'};
+  cols.innerHTML=Object.entries(grupos).filter(([,g])=>g.length).map(([nivel,grupo])=>{
+    const sorted=[...grupo].sort((a,b)=>(a.anio||9999)-(b.anio||9999));
+    const decadas={};
+    sorted.forEach(t=>{const d=t.anio?Math.floor(t.anio/10)*10:'En curso';if(!decadas[d])decadas[d]=[];decadas[d].push(t);});
+    return `<div class="tree-col">
+      <div class="tree-col-header" style="color:${colores[nivel]}">${nivel} (${grupo.length})</div>
+      ${Object.entries(decadas).map(([d,items])=>`
+        <div class="decade">
+          <div class="decade-label">${d!=='En curso'?d+'s':d}</div>
+          ${items.map(t=>`<div class="tcard ${t.estado==='En curso'?'en-curso':''}" onclick="abrirModal('${t.id}')">
+            <div class="tcard-name">${t.nombre}</div>
+            <div class="tcard-tema">${t.tema||'—'}</div>
+            <div class="tcard-meta">${t.periodo||t.anio||'en curso'}</div>
+          </div>`).join('')}
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+// ============ LISTA ============
+function renderLista(){
+  const q=(document.getElementById('search')||{}).value||'';
+  const filt=tesistas.filter(t=>{
+    const mf=listaFiltro==='todos'||t.nivel===listaFiltro||(listaFiltro==='En curso'&&t.estado==='En curso');
+    const ms=!q||[t.nombre,t.tema,t.inst,String(t.anio||'')].some(v=>v&&v.toLowerCase().includes(q.toLowerCase()));
+    return mf&&ms;
+  });
+  const nbadge={Doctorado:'bd',Licenciatura:'bl',Posdoctorado:'bp',Master:'bm'};
+  document.getElementById('lista-cont').innerHTML=filt.length
+    ?filt.map(t=>`<div class="list-row">
+        <div class="list-info">
+          <div class="list-name">${t.nombre} ${t.estado==='En curso'?'<span class="badge bc">en curso</span>':''}</div>
+          <div class="list-tema">${t.tema||'—'}</div>
+          <div class="list-meta">${t.inst||''} ${t.periodo?'· '+t.periodo:t.anio?'· '+t.anio:''}</div>
+        </div>
+        <span class="badge ${nbadge[t.nivel]||'bd'}">${t.nivel.substring(0,3)}</span>
+        <button class="btn-sec" onclick="abrirModal('${t.id}')">Ver</button>
+      </div>`).join('')
+    :'<p class="empty">Sin resultados</p>';
+}
+
+function flista(v,btn){listaFiltro=v;document.querySelectorAll('#sec-lista .fbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderLista();}
+
+// ============ MODAL TESISTA ============
+function abrirModal(id){
+  const t=tesistas.find(x=>x.id===id);
+  if(!t) return;
+  const c=NCOL[t.nivel]||{f:'#888'};
+  const ini=t.nombre.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+  // Campañas del tesista
+  const camps=campanas.filter(c=>c.campana_tesistas&&c.campana_tesistas.some(ct=>ct.tesista_id===t.id));
+  document.getElementById('modal-content').innerHTML=`
+    <div class="modal-head">
+      <div class="avatar" style="background:${c.f}22;color:${c.f}">${ini}</div>
+      <div><div style="font-size:15px;font-weight:600">${t.nombre}</div><div style="font-size:12px;color:var(--muted)">${t.inst||''}</div></div>
+      <button class="close-btn" onclick="cerrarModal()">×</button>
+    </div>
+    <table>
+      <tr><td>Nivel</td><td><span class="badge ${({Doctorado:'bd',Licenciatura:'bl',Posdoctorado:'bp',Master:'bm'})[t.nivel]||'bd'}">${t.nivel}</span></td></tr>
+      <tr><td>Período</td><td>${t.periodo||t.anio||'—'}</td></tr>
+      <tr><td>Estado</td><td>${t.estado||'—'}</td></tr>
+      <tr><td>Tema</td><td style="font-size:12px">${t.tema||'—'}</td></tr>
+      ${t.lat?`<tr><td>GPS</td><td style="font-size:11px;color:var(--muted)">${t.lat.toFixed(3)}, ${t.lng.toFixed(3)}</td></tr>`:''}
+    </table>
+    ${(t.posicion_actual||t.prov||t.email)?`
+    <div style="margin-top:14px;padding:12px 14px;background:#F5F4F1;border-radius:8px;border:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px">Actualidad</div>
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        ${t.posicion_actual?'<tr><td style="color:var(--muted);width:110px;padding:3px 0">Posición</td><td>'+t.posicion_actual+'</td></tr>':''}
+        ${t.prov?'<tr><td style="color:var(--muted);padding:3px 0">Provincia</td><td>'+t.prov+'</td></tr>':''}
+        ${t.email?'<tr><td style="color:var(--muted);padding:3px 0">Email</td><td><a href="mailto:'+t.email+'" style="color:var(--azul)">'+t.email+'</a></td></tr>':''}
+      </table>
+    </div>`:''}
+    <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      ${t.url_tesis?`<a href="${t.url_tesis}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#E6F1FB;color:#185FA5;border:1px solid #B5D4F4;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:500;text-decoration:none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Ver tesis
+      </a>`:'<span style="font-size:11px;color:var(--muted)">Sin tesis digital vinculada</span>'}
+    </div>
+    ${admLoggedIn?`<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:500;margin-bottom:8px;color:var(--muted)">Gestión de tesis digital</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">URL del repositorio (opcional)</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input id="edit-url-tesis" value="${t.url_tesis||''}" placeholder="https://bibliotecadigital.exactas.uba.ar/..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;outline:none;background:white;margin:0">
+        <button onclick="guardarUrlTesis('${t.id}')" style="background:#185FA5;color:white;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap">Guardar URL</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">O subir PDF directamente</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="file" id="pdf-upload-${t.id}" accept=".pdf" style="font-size:11px;flex:1;min-width:0;border:1px solid var(--border);border-radius:8px;padding:5px 8px;background:white;margin:0">
+        <button onclick="subirPdfTesis('${t.id}','${t.nombre}')" style="background:#1D9E75;color:white;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap">Subir PDF</button>
+      </div>
+      <p id="pdf-msg-${t.id}" style="font-size:11px;margin-top:6px"></p>
+    </div>`:''}
+    ${t.anecdota?`<div class="anecdota">${t.anecdota}</div>`:''}
+    ${camps.length?`<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:500;margin-bottom:8px;color:var(--muted)">Campañas</div>
+      ${camps.map(c=>`<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)">${c.nombre||'Campaña '+c.anio} <span style="color:var(--muted)">${c.zona||''} · ${c.anio||''}</span></div>`).join('')}
+    </div>`:''}
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
+      ${t.lat ? `<button class="btn-primary" onclick="irAlMapa('${t.id}')">Ver en mapa</button>` : '<span style="font-size:11px;color:var(--muted)">Sin coordenadas GPS</span>'}
+      ${admLoggedIn ? `<button class="btn-sec" onclick="admEditar('${t.id}');cerrarModal();showTab('admin')">Editar</button>
+      <button class="btn-danger" onclick="admEliminar('${t.id}');cerrarModal()">Eliminar</button>` : ''}
+    </div>
+  `;
+  document.getElementById('modal').classList.add('open');
+}
+function cerrarModal(){document.getElementById('modal').classList.remove('open');}
+
+// ============ CAMPAÑAS ============
+function renderCampanas(){
+  const cont=document.getElementById('campanas-lista');
+  if(admLoggedIn) document.getElementById('btn-nueva-campana').style.display='block';
+  if(!campanas.length){cont.innerHTML='<p class="empty">No hay campañas registradas aún.</p>';return;}
+  const q=(document.getElementById('campanas-search')||{}).value||'';
+  const lista = q ? campanas.filter(c=>{
+    const parts=[...(c.campana_tesistas||[]).map(p=>p.tesistas?.nombre||''), ...(c.campana_externos||[]).map(e=>e.participantes_externos?.nombre||'')];
+    return [c.nombre,c.zona,String(c.anio||''),c.descripcion||'',...parts].some(v=>v&&v.toLowerCase().includes(q.toLowerCase()));
+  }) : campanas;
+  if(!lista.length){cont.innerHTML='<p class="empty">No hay resultados para "'+q+'".</p>';return;}
+  cont.innerHTML=lista.map((c,idx)=>{
+    const parts=c.campana_tesistas||[];
+    const fotos=c.campana_fotos||[];
+    return `<div class="campana-card" onclick="abrirCampana('${c.id}')">
+      <div class="campana-header">
+        <div class="campana-year">${c.anio||'?'}</div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span style="font-size:11px;font-weight:600;color:var(--muted);min-width:24px">#${idx+1}</span>
+            <div class="campana-title">${c.nombre||'Campaña sin nombre'}</div>
+          </div>
+          <div class="campana-sub">${c.zona||''} ${c.fecha_inicio?'· '+c.fecha_inicio.substring(0,7):''}</div>
+        </div>
+      </div>
+      <div class="campana-badges">
+        ${[...parts.slice(0,6).map(p=>`<span class="badge bl">${p.tesistas?.nombre||''}</span>`),
+           ...(c.campana_externos||[]).slice(0,Math.max(0,6-parts.length)).map(e=>`<span class="badge bc">${e.participantes_externos?.nombre||''}</span>`)
+          ].join('')}
+        ${(parts.length+(c.campana_externos||[]).length)>6?`<span class="badge" style="background:#eee;color:#666">+${(parts.length+(c.campana_externos||[]).length)-6} más</span>`:''}
+      </div>
+      ${fotos.length?`<div class="fotos-grid">${fotos.slice(0,4).map(f=>`<img class="foto-thumb" src="${f.url}" alt="${f.caption||''}">`).join('')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+async function abrirCampana(id){
+  const c=campanas.find(x=>x.id===id);
+  if(!c) return;
+  renderModalCampana(c);
+  document.getElementById('modal-campana').classList.add('open');
+}
+
+function renderModalCampana(c){
+  const parts=c.campana_tesistas||[];
+  const externos=c.campana_externos||[];
+  const fotos=(c.campana_fotos||[]).sort((a,b)=>a.orden-b.orden);
+  const partIds=new Set(parts.map(p=>p.tesista_id));
+  const disponibles=tesistas.filter(t=>!partIds.has(t.id)).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+
+  document.getElementById('modal-campana-content').innerHTML=`
+    <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px">
+      <div style="background:var(--azul);color:white;border-radius:8px;padding:6px 14px;font-size:15px;font-weight:600;flex-shrink:0">${c.anio||'?'}</div>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:600">${c.nombre||'Campaña sin nombre'}</div>
+        <div style="font-size:12px;color:var(--muted)">${c.zona||''} ${c.fecha_inicio?'· '+c.fecha_inicio:''} ${c.fecha_fin&&c.fecha_fin!==c.fecha_inicio?'→ '+c.fecha_fin:''}</div>
+      </div>
+      <button class="close-btn" onclick="cerrarModalCampana()">×</button>
+    </div>
+
+    ${admLoggedIn?`<div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn-sec" style="font-size:12px;padding:6px 14px" onclick="editarCampana('${c.id}')">✏️ Editar campaña</button>
+      <button class="btn-danger" style="font-size:12px" onclick="eliminarCampana('${c.id}')">Eliminar campaña</button>
+    </div>`:''}
+
+    ${c.descripcion?`<p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6">${c.descripcion}</p>`:''}
+    ${c.vehiculos?`<p style="font-size:12px;color:var(--muted);margin-bottom:14px">🚗 ${c.vehiculos}</p>`:''}
+
+    ${(()=>{
+      const links = Array.isArray(c.links) ? c.links : (c.links ? JSON.parse(c.links) : []);
+      if(!links.length) return '';
+      return `<div style="margin-bottom:16px">
+        <div style="font-size:12px;font-weight:500;margin-bottom:8px">🔗 Links</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          ${links.map(l=>`<a href="${l.url}" target="_blank" rel="noopener"
+            style="font-size:12px;color:var(--azul);text-decoration:none;display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
+            <span style="font-size:14px">↗</span>
+            <span>${l.titulo||l.url}</span>
+          </a>`).join('')}
+        </div>
+      </div>`;
+    })()}
+
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:500;margin-bottom:8px">Participantes (${parts.length + externos.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px" id="badges-participantes">
+        ${parts.map(p=>`
+          <span style="display:inline-flex;align-items:center;gap:4px;background:#E1F5EE;color:#0F6E56;font-size:11px;padding:3px 8px;border-radius:4px;font-weight:500">
+            <span style="cursor:pointer" onclick="cerrarModalCampana();abrirModal('${p.tesista_id}')">${p.tesistas?.nombre||''}</span>
+            ${admLoggedIn?`<span onclick="quitarParticipante('${c.id}','${p.tesista_id}')" style="cursor:pointer;color:#A32D2D;font-size:13px;line-height:1;margin-left:2px" title="Quitar">×</span>`:''}
+          </span>`).join('')}
+        ${externos.map(e=>`
+          <span style="display:inline-flex;align-items:center;gap:4px;background:#FFF3E0;color:#B45309;font-size:11px;padding:3px 8px;border-radius:4px;font-weight:500">
+            <span title="${e.participantes_externos?.rol||'Participante externo'}">${e.participantes_externos?.nombre||('Externo '+e.externo_id?.substring(0,6))}${e.participantes_externos?.rol?' ('+e.participantes_externos.rol+')':''}</span>
+            ${admLoggedIn?`<span onclick="quitarExterno('${c.id}','${e.externo_id}')" style="cursor:pointer;color:#A32D2D;font-size:13px;line-height:1;margin-left:2px" title="Quitar">×</span>`:''}
+          </span>`).join('')}
+        ${!parts.length&&!externos.length?'<span style="font-size:12px;color:var(--muted)">Sin participantes registrados</span>':''}
+      </div>
+
+      ${admLoggedIn?`
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+          <select id="sel-nuevo-part" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;outline:none;background:white">
+            <option value="">— Agregar tesista —</option>
+            ${disponibles.map(t=>`<option value="${t.id}">${t.nombre} (${t.nivel})</option>`).join('')}
+          </select>
+          <button class="btn-primary" style="font-size:12px;padding:7px 14px;white-space:nowrap" onclick="agregarParticipante('${c.id}')">Agregar</button>
+        </div>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Agregar participante externo (guía, técnico, colaborador...)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <input id="ext-nombre" placeholder="Nombre completo" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;outline:none;background:white;margin:0">
+            <input id="ext-rol" placeholder="Rol (ej: Guía de campo)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;outline:none;background:white;margin:0">
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="ext-inst" placeholder="Institución (opcional)" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;outline:none;background:white;margin:0">
+            <button class="btn-primary" style="font-size:12px;padding:6px 14px;white-space:nowrap" onclick="agregarExterno('${c.id}')">Agregar</button>
+          </div>
+        </div>
+        <p id="part-msg" style="font-size:11px;margin-top:6px"></p>
+      `:''}
+    </div>
+
+    ${fotos.length?`<div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:500;margin-bottom:8px">Fotos (${fotos.length})</div>
+      <div class="fotos-grid" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">
+        ${fotos.map(f=>`<img class="foto-thumb" src="${f.url}" alt="${f.caption||''}" onclick="event.stopPropagation();abrirLightbox('${f.url}','${f.caption||''}')">`).join('')}
+      </div>
+    </div>`:'<p style="font-size:12px;color:var(--muted);margin-bottom:14px">Sin fotos registradas.</p>'}
+
+    ${admLoggedIn?`<div style="margin-top:4px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:500;margin-bottom:8px">Subir fotos</div>
+      <input type="file" id="foto-upload" multiple accept="image/*" style="font-size:12px">
+      <input id="foto-caption" placeholder="Descripción (opcional)" style="margin-top:8px;width:100%;border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:12px;outline:none">
+      <button class="btn-primary" style="margin-top:8px;font-size:12px;padding:7px 14px" onclick="subirFotos('${c.id}')">Subir fotos</button>
+      <p id="foto-msg" style="font-size:11px;margin-top:6px"></p>
+    </div>`:''}
+  `;
+}
+
+async function agregarParticipante(campanaId){
+  const sel=document.getElementById('sel-nuevo-part');
+  const tesistaId=sel.value;
+  const msg=document.getElementById('part-msg');
+  if(!tesistaId){msg.style.color='#A32D2D';msg.textContent='Seleccioná un tesista.';return;}
+  const {error}=await db.from('campana_tesistas').insert({campana_id:campanaId,tesista_id:tesistaId});
+  if(error){msg.style.color='#A32D2D';msg.textContent='Error: '+error.message;return;}
+  msg.style.color='#0F6E56';
+  msg.textContent='Participante agregado.';
+  await cargarCampanas();
+  const c=campanas.find(x=>x.id===campanaId);
+  if(c) renderModalCampana(c);
+}
+
+async function quitarParticipante(campanaId,tesistaId){
+  if(!confirm('¿Quitar este participante de la campaña?')) return;
+  await db.from('campana_tesistas').delete().eq('campana_id',campanaId).eq('tesista_id',tesistaId);
+  await cargarCampanas();
+  const c=campanas.find(x=>x.id===campanaId);
+  if(c) renderModalCampana(c);
+}
+function cerrarModalCampana(){document.getElementById('modal-campana').classList.remove('open');}
+
+async function abrirNuevaCampana(){
+  document.getElementById('modal-campana-content').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-size:15px;font-weight:600">Nueva campaña de campo</h3>
+      <button class="close-btn" onclick="cerrarModalCampana()">×</button>
+    </div>
+    <div class="form-group"><label>Nombre de la campaña</label><input id="nc-nombre" placeholder="Ej: Alta Cordillera 1990"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Año</label><input id="nc-anio" type="number"></div>
+      <div class="form-group"><label>Zona</label><input id="nc-zona" placeholder="Ej: Mendoza - Río Plomo"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Fecha inicio</label><input id="nc-fi" type="date"></div>
+      <div class="form-group"><label>Fecha fin</label><input id="nc-ff" type="date"></div>
+    </div>
+    <div class="form-group">
+      <label>Ubicación en el mapa <span style="font-weight:400;color:var(--muted)">(hacé clic para colocar el pin)</span></label>
+      <div id="nc-minimap" style="width:100%;height:220px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;cursor:crosshair"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label>Latitud</label>
+          <input id="nc-lat" type="number" step="0.0001" oninput="ncActualizarPinDesdeInputs()">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Longitud</label>
+          <input id="nc-lng" type="number" step="0.0001" oninput="ncActualizarPinDesdeInputs()">
+        </div>
+      </div>
+    </div>
+    <div class="form-group"><label>Vehículos usados</label><input id="nc-veh" placeholder="Ej: El Rayo Plateado (Estanciera)"></div>
+    <div class="form-group"><label>Descripción</label><textarea id="nc-desc" rows="3" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;outline:none"></textarea></div>
+    <div class="form-group">
+      <label>Links</label>
+      <div id="nc-links-cont"></div>
+      <button type="button" onclick="ncAgregarLink()" style="margin-top:6px;background:transparent;border:1px dashed var(--border);border-radius:7px;padding:6px 14px;font-size:12px;color:var(--muted);cursor:pointer;width:100%">+ Agregar link</button>
+    </div>
+    <div class="form-group">
+      <label>Participantes</label>
+      <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px">
+        ${tesistas.sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(t=>`
+          <label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:12px">
+            <input type="checkbox" value="${t.id}" class="nc-part"> ${t.nombre} <span style="color:var(--muted);font-size:10px">(${t.nivel})</span>
+          </label>`).join('')}
+      </div>
+    </div>
+    <button class="btn-primary" onclick="guardarCampana()">Guardar campaña</button>
+    <p id="nc-msg" style="font-size:12px;margin-top:8px"></p>
+  `;
+  document.getElementById('modal-campana').classList.add('open');
+
+  // Links para nueva campaña
+  window.ncLinks = [];
+  window.ncRenderLinks = function(){
+    const cont = document.getElementById('nc-links-cont');
+    if(!cont) return;
+    cont.innerHTML = ncLinks.map((l,i)=>`
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center">
+        <input value="${l.titulo||''}" placeholder="Título (ej: Artículo DOI)"
+          oninput="ncLinks[${i}].titulo=this.value"
+          style="border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12px;outline:none;background:white;margin:0">
+        <input value="${l.url||''}" placeholder="https://…"
+          oninput="ncLinks[${i}].url=this.value"
+          style="border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12px;outline:none;background:white;margin:0">
+        <button onclick="ncLinks.splice(${i},1);ncRenderLinks()"
+          style="background:transparent;border:1px solid #F09595;border-radius:6px;color:#A32D2D;padding:5px 9px;font-size:13px;cursor:pointer">×</button>
+      </div>`).join('');
+  };
+  window.ncAgregarLink = function(){
+    ncLinks.push({titulo:'', url:''});
+    ncRenderLinks();
+  };
+
+  // Mini-mapa para nueva campaña
+  setTimeout(()=>{
+    const ncMap = L.map('nc-minimap',{center:[-35,-67],zoom:4});
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {attribution:'© Esri',maxZoom:18}).addTo(ncMap);
+    let ncPin = null;
+    function ncColocarPin(lat,lng){
+      if(ncPin) ncMap.removeLayer(ncPin);
+      const sz=28;
+      const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}">
+        <polygon points="${sz/2},2 ${sz-2},${sz-4} 2,${sz-4}" fill="#EF9F27" stroke="#BA7517" stroke-width="1.5"/>
+        <text x="${sz/2}" y="${sz-6}" text-anchor="middle" font-size="10" fill="white" font-weight="700" font-family="Arial">C</text>
+      </svg>`;
+      const icon=L.divIcon({html:svg,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz-2]});
+      ncPin=L.marker([lat,lng],{icon,draggable:true}).addTo(ncMap);
+      ncPin.on('dragend',e=>{
+        const p=e.target.getLatLng();
+        document.getElementById('nc-lat').value=p.lat.toFixed(4);
+        document.getElementById('nc-lng').value=p.lng.toFixed(4);
+      });
+    }
+    ncMap.on('click',e=>{
+      ncColocarPin(e.latlng.lat,e.latlng.lng);
+      document.getElementById('nc-lat').value=e.latlng.lat.toFixed(4);
+      document.getElementById('nc-lng').value=e.latlng.lng.toFixed(4);
+    });
+    window.ncActualizarPinDesdeInputs=function(){
+      const lat=parseFloat(document.getElementById('nc-lat').value);
+      const lng=parseFloat(document.getElementById('nc-lng').value);
+      if(!isNaN(lat)&&!isNaN(lng)){ncColocarPin(lat,lng);ncMap.setView([lat,lng],ncMap.getZoom());}
+    };
+    ncMap.invalidateSize();
+  },150);
+}
+
+async function guardarCampana(){
+  const nombre=document.getElementById('nc-nombre').value.trim();
+  if(!nombre){document.getElementById('nc-msg').textContent='Ingresá un nombre.';return;}
+  const campData={
+    nombre,
+    anio:parseInt(document.getElementById('nc-anio').value)||null,
+    zona:document.getElementById('nc-zona').value,
+    fecha_inicio:document.getElementById('nc-fi').value||null,
+    fecha_fin:document.getElementById('nc-ff').value||null,
+    lat:parseFloat(document.getElementById('nc-lat').value)||null,
+    lng:parseFloat(document.getElementById('nc-lng').value)||null,
+    vehiculos:document.getElementById('nc-veh').value,
+    descripcion:document.getElementById('nc-desc').value,
+    links: (window.ncLinks||[]).filter(l=>l.url.trim()),
+  };
+  const {data:camp,error}=await db.from('campanas').insert(campData).select().single();
+  if(error){document.getElementById('nc-msg').textContent='Error: '+error.message;return;}
+  // Agregar participantes
+  const partic=[...document.querySelectorAll('.nc-part:checked')].map(el=>({campana_id:camp.id,tesista_id:el.value}));
+  if(partic.length) await db.from('campana_tesistas').insert(partic);
+  document.getElementById('nc-msg').className='msg-ok';
+  document.getElementById('nc-msg').textContent='Campaña guardada correctamente.';
+  await cargarCampanas();
+  setTimeout(()=>{cerrarModalCampana();renderCampanas();renderMapa();renderStats();},1200);
+}
+
+async function subirFotos(campanaId){
+  const files=document.getElementById('foto-upload').files;
+  const caption=document.getElementById('foto-caption').value;
+  const msg=document.getElementById('foto-msg');
+  if(!files.length){msg.textContent='Seleccioná al menos una foto.';return;}
+  msg.textContent='Subiendo...';
+  for(const file of files){
+    const ext=file.name.split('.').pop();
+    const path=`${campanaId}/${Date.now()}.${ext}`;
+    const {error:upErr}=await db.storage.from('campanas-fotos').upload(path,file);
+    if(upErr){msg.textContent='Error subiendo foto: '+upErr.message;return;}
+    const {data:{publicUrl}}=db.storage.from('campanas-fotos').getPublicUrl(path);
+    await db.from('campana_fotos').insert({campana_id:campanaId,url:publicUrl,caption});
+  }
+  msg.className='msg-ok';
+  msg.textContent='Fotos subidas correctamente.';
+  await cargarCampanas();
+  setTimeout(()=>abrirCampana(campanaId),800);
+}
+
+// ============ LIGHTBOX ============
+function abrirLightbox(url,cap){
+  document.getElementById('lightbox-img').src=url;
+  document.getElementById('lightbox-cap').textContent=cap;
+  document.getElementById('lightbox').classList.add('open');
+}
+function cerrarLightbox(){document.getElementById('lightbox').classList.remove('open');}
+
+// ============ PÚBLICO ============
+async function pubVerificar(){
+  const nombre=document.getElementById('pub-nombre').value.trim().toLowerCase();
+  const codigo=document.getElementById('pub-codigo').value.trim();
+  const t=tesistas.find(x=>x.codigo===codigo&&x.nombre.toLowerCase()===nombre);
+  const msg=document.getElementById('pub-msg');
+  if(t){
+    document.getElementById('pub-extra').style.display='block';
+    document.getElementById('pub-btns').innerHTML=`<button class="btn-primary" onclick="pubGuardar('${t.id}')">Guardar mis datos</button>`;
+    document.getElementById('pub-inst').value=t.inst||'';
+    document.getElementById('pub-prov').value=t.prov||'';
+    document.getElementById('pub-pos').value=t.posicion_actual||'';
+    document.getElementById('pub-email').value=t.email||'';
+    msg.className='msg-ok'; msg.textContent='Verificado. Actualizá tus datos.';
+  } else {
+    msg.className='msg-err'; msg.textContent='Nombre o código incorrecto.';
+  }
+}
+
+async function pubGuardar(id){
+  const {error}=await db.from('tesistas').update({
+    inst:document.getElementById('pub-inst').value,
+    prov:document.getElementById('pub-prov').value,
+    posicion_actual:document.getElementById('pub-pos').value,
+    email:document.getElementById('pub-email').value,
+  }).eq('id',id);
+  const msg=document.getElementById('pub-msg');
+  if(error){msg.className='msg-err';msg.textContent='Error al guardar: '+error.message;}
+  else{msg.className='msg-ok';msg.textContent='Datos guardados correctamente.';await cargarTesistas();}
+}
+
+// ============ ADMIN ============
+function checkPin(){
+  if(document.getElementById('adm-pin').value===ADMIN_PIN){
+    activarAdmin();
+    renderAdmLista();
+  } else alert('PIN incorrecto');
+}
+
+function activarAdmin(){
+  admLoggedIn=true;
+  sessionStorage.setItem('adm','1');
+  const pg=document.getElementById('pin-gate');
+  const ap=document.getElementById('adm-panel');
+  const bn=document.getElementById('btn-nueva-campana');
+  if(pg) pg.style.display='none';
+  if(ap) ap.style.display='block';
+  if(bn) bn.style.display='block';
+  // Inicializar mapa de ubicación (necesita un frame para que el div tenga tamaño)
+  setTimeout(()=>{
+    iniciarUbicarMapa();
+    renderUbicarLista();
+    // Pre-seleccionar la primera campaña sin ubicación
+    const primera = campanas.find(c=>!c.lat&&!c.lng);
+    if(primera) ubicarSeleccionar(primera.id);
+  }, 200);
+}
+
+function renderAdmLista(){
+  document.getElementById('adm-lista').innerHTML=`
+    <h4 style="font-size:13px;font-weight:500;margin-bottom:10px">Tesistas (${tesistas.length})</h4>`+
+    tesistas.slice(0,60).map(t=>`<div class="list-row">
+      <div class="list-info"><div class="list-name">${t.nombre} <span style="font-size:10px;color:var(--muted)">[${t.codigo||'—'}]</span></div>
+      <div class="list-meta">${t.nivel} · ${t.anio||'en curso'}</div></div>
+      <button class="btn-sec" style="font-size:11px;padding:4px 10px" onclick="admEditar('${t.id}')">Editar</button>
+      <button class="btn-danger" onclick="admEliminar('${t.id}')">×</button>
+    </div>`).join('');
+}
+
+function admEditar(id){
+  const t=tesistas.find(x=>x.id===id);
+  if(!t) return;
+  document.getElementById('adm-id').value=t.id;
+  document.getElementById('adm-nombre').value=t.nombre||'';
+  document.getElementById('adm-nivel').value=t.nivel||'Doctorado';
+  document.getElementById('adm-tema').value=t.tema||'';
+  document.getElementById('adm-inst').value=t.inst||'';
+  document.getElementById('adm-periodo').value=t.periodo||'';
+  document.getElementById('adm-anio').value=t.anio||'';
+  document.getElementById('adm-estado').value=t.estado||'Completada';
+  document.getElementById('adm-lat').value=t.lat||'';
+  document.getElementById('adm-lng').value=t.lng||'';
+  document.getElementById('adm-anecdota').value=t.anecdota||'';
+  document.getElementById('adm-codigo').value=t.codigo||'';
+  document.getElementById('adm-panel').scrollIntoView({behavior:'smooth'});
+}
+
+async function admGuardar(){
+  const id=document.getElementById('adm-id').value;
+  const data={
+    nombre:document.getElementById('adm-nombre').value.trim(),
+    nivel:document.getElementById('adm-nivel').value,
+    tema:document.getElementById('adm-tema').value,
+    inst:document.getElementById('adm-inst').value,
+    periodo:document.getElementById('adm-periodo').value,
+    anio:parseInt(document.getElementById('adm-anio').value)||null,
+    estado:document.getElementById('adm-estado').value,
+    lat:parseFloat(document.getElementById('adm-lat').value)||null,
+    lng:parseFloat(document.getElementById('adm-lng').value)||null,
+    anecdota:document.getElementById('adm-anecdota').value||null,
+    codigo:document.getElementById('adm-codigo').value,
+  };
+  if(!data.nombre){document.getElementById('adm-msg').textContent='Ingresá el nombre.';return;}
+  let error;
+  if(id){({error}=await db.from('tesistas').update(data).eq('id',id));}
+  else{data.id='id_'+Date.now();({error}=await db.from('tesistas').insert(data));}
+  const msg=document.getElementById('adm-msg');
+  if(error){msg.className='msg-err';msg.textContent='Error: '+error.message;}
+  else{
+    msg.className='msg-ok';msg.textContent='Guardado correctamente.';
+    admLimpiar(); await cargarTesistas(); renderArbol(); renderLista(); renderAdmLista(); renderMapa(); renderStats();
+  }
+}
+
+async function admEliminar(id){
+  if(!confirm('¿Eliminar este tesista?')) return;
+  await db.from('tesistas').delete().eq('id',id);
+  await cargarTesistas(); renderArbol(); renderLista(); renderAdmLista(); renderMapa(); renderStats();
+}
+
+function admLimpiar(){
+  ['adm-nombre','adm-tema','adm-inst','adm-periodo','adm-anio','adm-lat','adm-lng','adm-anecdota','adm-codigo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('adm-nivel').value='Doctorado';
+  document.getElementById('adm-estado').value='Completada';
+  document.getElementById('adm-id').value='';
+  document.getElementById('adm-msg').textContent='';
+}
+
+// ============ TABS ============
+function showTab(t){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+t).classList.add('active');
+  document.querySelectorAll('.tab')[['mapa','red','campanas','lista','miperfil','admin'].indexOf(t)].classList.add('active');
+  if(t==='mapa'&&leafMap) setTimeout(()=>leafMap.invalidateSize(),100);
+  // Restaurar estado admin si ya estaba logueado
+  if(sessionStorage.getItem('adm')==='1' && !admLoggedIn){
+    activarAdmin();
+    if(t==='admin') renderAdmLista();
+  }
+}
+
+
+function irAlMapa(id){
+  const t = tesistas.find(x => x.id === id);
+  if(!t || !t.lat || !t.lng) { alert('Este tesista no tiene coordenadas GPS asignadas.'); return; }
+  cerrarModal();
+  showTab('mapa');
+  setTimeout(() => {
+    leafMap.setView([t.lat, t.lng], 10, {animate: true});
+    // Abrir el popup del marcador más cercano
+    markersLayer.eachLayer(layer => {
+      const pos = layer.getLatLng();
+      if(Math.hypot(pos.lat - t.lat, pos.lng - t.lng) < 0.3) {
+        layer.openPopup();
+      }
+    });
+  }, 200);
+}
+
+
+async function editarCampana(id){
+  const c=campanas.find(x=>x.id===id);
+  if(!c) return;
+  document.getElementById('modal-campana-content').innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+      <div style="font-size:15px;font-weight:600;flex:1">Editar campaña</div>
+      <button class="close-btn" onclick="cerrarModalCampana()">×</button>
+    </div>
+    <div class="form-group"><label>Nombre</label><input id="ec-nombre" value="${c.nombre||''}"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Año</label><input id="ec-anio" type="number" value="${c.anio||''}"></div>
+      <div class="form-group"><label>Zona</label><input id="ec-zona" value="${c.zona||''}"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Fecha inicio</label><input id="ec-fi" type="date" value="${c.fecha_inicio||''}"></div>
+      <div class="form-group"><label>Fecha fin</label><input id="ec-ff" type="date" value="${c.fecha_fin||''}"></div>
+    </div>
+
+    <div class="form-group">
+      <label>Ubicación en el mapa <span style="font-weight:400;color:var(--muted)">(hacé clic para mover el pin)</span></label>
+      <div id="ec-minimap" style="width:100%;height:220px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;cursor:crosshair"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label>Latitud</label>
+          <input id="ec-lat" type="number" step="0.0001" value="${c.lat||''}" oninput="ecActualizarPinDesdeInputs()">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Longitud</label>
+          <input id="ec-lng" type="number" step="0.0001" value="${c.lng||''}" oninput="ecActualizarPinDesdeInputs()">
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:5px">También podés escribir las coordenadas directamente. Para borrar la ubicación, dejá los campos vacíos.</p>
+    </div>
+
+    <div class="form-group"><label>Vehículos</label><input id="ec-veh" value="${c.vehiculos||''}"></div>
+    <div class="form-group"><label>Descripción</label>
+      <textarea id="ec-desc" rows="4" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;resize:vertical">${c.descripcion||''}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Links</label>
+      <div id="ec-links-cont"></div>
+      <button type="button" onclick="ecAgregarLink()" style="margin-top:6px;background:transparent;border:1px dashed var(--border);border-radius:7px;padding:6px 14px;font-size:12px;color:var(--muted);cursor:pointer;width:100%">+ Agregar link</button>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn-primary" onclick="guardarEditCampana('${c.id}')">Guardar cambios</button>
+      <button class="btn-sec" onclick="abrirCampana('${c.id}')">Cancelar</button>
+    </div>
+    <p id="ec-msg" style="font-size:12px;margin-top:8px"></p>
+  `;
+
+  // Inicializar links
+  window.ecLinks = Array.isArray(c.links) ? JSON.parse(JSON.stringify(c.links))
+                   : (c.links ? JSON.parse(c.links) : []);
+  window.ecRenderLinks = function(){
+    const cont = document.getElementById('ec-links-cont');
+    if(!cont) return;
+    cont.innerHTML = ecLinks.map((l,i)=>`
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center">
+        <input value="${l.titulo||''}" placeholder="Título (ej: Artículo DOI)"
+          oninput="ecLinks[${i}].titulo=this.value"
+          style="border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12px;outline:none;background:white;margin:0">
+        <input value="${l.url||''}" placeholder="https://…"
+          oninput="ecLinks[${i}].url=this.value"
+          style="border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12px;outline:none;background:white;margin:0">
+        <button onclick="ecLinks.splice(${i},1);ecRenderLinks()"
+          style="background:transparent;border:1px solid #F09595;border-radius:6px;color:#A32D2D;padding:5px 9px;font-size:13px;cursor:pointer;flex-shrink:0">×</button>
+      </div>`).join('');
+  };
+  window.ecAgregarLink = function(){
+    ecLinks.push({titulo:'', url:''});
+    ecRenderLinks();
+  };
+  ecRenderLinks();
+
+  // Inicializar mini-mapa
+  const initLat = c.lat || -35;
+  const initLng = c.lng || -67;
+  const initZoom = c.lat ? 8 : 4;
+
+  const miniMap = L.map('ec-minimap', {center:[initLat, initLng], zoom:initZoom});
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    {attribution:'© Esri', maxZoom:18}).addTo(miniMap);
+
+  let ecPin = null;
+
+  function colocarPin(lat, lng){
+    if(ecPin) miniMap.removeLayer(ecPin);
+    const sz=28;
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}">
+      <polygon points="${sz/2},2 ${sz-2},${sz-4} 2,${sz-4}" fill="#EF9F27" stroke="#BA7517" stroke-width="1.5"/>
+      <text x="${sz/2}" y="${sz-6}" text-anchor="middle" font-size="10" fill="white" font-weight="700" font-family="Arial">C</text>
+    </svg>`;
+    const icon=L.divIcon({html:svg,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz-2]});
+    ecPin = L.marker([lat,lng],{icon, draggable:true}).addTo(miniMap);
+    ecPin.on('dragend', e=>{
+      const pos = e.target.getLatLng();
+      document.getElementById('ec-lat').value = pos.lat.toFixed(4);
+      document.getElementById('ec-lng').value = pos.lng.toFixed(4);
+    });
+  }
+
+  if(c.lat && c.lng) colocarPin(c.lat, c.lng);
+
+  miniMap.on('click', e=>{
+    const {lat,lng} = e.latlng;
+    colocarPin(lat, lng);
+    document.getElementById('ec-lat').value = lat.toFixed(4);
+    document.getElementById('ec-lng').value = lng.toFixed(4);
+  });
+
+  // Función global para actualizar pin desde inputs de texto
+  window.ecActualizarPinDesdeInputs = function(){
+    const lat = parseFloat(document.getElementById('ec-lat').value);
+    const lng = parseFloat(document.getElementById('ec-lng').value);
+    if(!isNaN(lat) && !isNaN(lng)){
+      colocarPin(lat, lng);
+      miniMap.setView([lat,lng], miniMap.getZoom());
+    }
+  };
+
+  // Fix: el modal puede cortar el mapa, invalidar tamaño al siguiente frame
+  setTimeout(()=>miniMap.invalidateSize(),150);
+}
+
+async function guardarEditCampana(id){
+  const msg=document.getElementById('ec-msg');
+  const data={
+    nombre:document.getElementById('ec-nombre').value.trim(),
+    anio:parseInt(document.getElementById('ec-anio').value)||null,
+    zona:document.getElementById('ec-zona').value,
+    fecha_inicio:document.getElementById('ec-fi').value||null,
+    fecha_fin:document.getElementById('ec-ff').value||null,
+    lat:parseFloat(document.getElementById('ec-lat').value)||null,
+    lng:parseFloat(document.getElementById('ec-lng').value)||null,
+    vehiculos:document.getElementById('ec-veh').value,
+    descripcion:document.getElementById('ec-desc').value,
+    links: (window.ecLinks||[]).filter(l=>l.url.trim()),
+  };
+  if(!data.nombre){msg.style.color='#A32D2D';msg.textContent='El nombre es obligatorio.';return;}
+  const {error}=await db.from('campanas').update(data).eq('id',id);
+  if(error){msg.style.color='#A32D2D';msg.textContent='Error: '+error.message;return;}
+  msg.style.color='#0F6E56';msg.textContent='Guardado correctamente.';
+  await cargarCampanas();
+  setTimeout(()=>{renderCampanas();renderMapa();abrirCampana(id);},800);
+}
+
+async function eliminarCampana(id){
+  if(!confirm('¿Eliminar esta campaña? Se borrarán también todos los participantes y fotos asociadas.')) return;
+  await db.from('campanas').delete().eq('id',id);
+  cerrarModalCampana();
+  await cargarCampanas();
+  renderCampanas();
+  renderMapa();
+  renderStats();
+}
+
+
+async function guardarUrlTesis(id){
+  const url = document.getElementById('edit-url-tesis').value.trim();
+  const {error} = await db.from('tesistas').update({url_tesis: url||null}).eq('id', id);
+  const msg = document.getElementById('pdf-msg-'+id);
+  if(error){ msg.style.color='#A32D2D'; msg.textContent='Error: '+error.message; return; }
+  msg.style.color='#0F6E56'; msg.textContent='URL guardada correctamente.';
+  await cargarTesistas();
+  setTimeout(()=>abrirModal(id), 600);
+}
+
+async function subirPdfTesis(id, nombre){
+  const input = document.getElementById('pdf-upload-'+id);
+  const msg = document.getElementById('pdf-msg-'+id);
+  if(!input || !input.files.length){ msg.style.color='#A32D2D'; msg.textContent='Seleccioná un archivo PDF.'; return; }
+  const file = input.files[0];
+  if(file.type !== 'application/pdf'){ msg.style.color='#A32D2D'; msg.textContent='El archivo debe ser un PDF.'; return; }
+  msg.style.color='#888'; msg.textContent='Subiendo PDF...';
+  const safeName = nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_');
+  const path = id+'/'+safeName+'.pdf';
+  const {error: upErr} = await db.storage.from('tesis-pdfs').upload(path, file, {upsert: true});
+  if(upErr){ msg.style.color='#A32D2D'; msg.textContent='Error subiendo: '+upErr.message; return; }
+  const {data:{publicUrl}} = db.storage.from('tesis-pdfs').getPublicUrl(path);
+  const {error: dbErr} = await db.from('tesistas').update({url_tesis: publicUrl}).eq('id', id);
+  if(dbErr){ msg.style.color='#A32D2D'; msg.textContent='PDF subido pero error al guardar URL: '+dbErr.message; return; }
+  msg.style.color='#0F6E56'; msg.textContent='PDF subido y vinculado correctamente.';
+  await cargarTesistas();
+  setTimeout(()=>abrirModal(id), 800);
+}
+
+
+// ============ MI PERFIL ============
+let perfilTesistaId = null;
+
+async function perfilVerificar(){
+  const nombre = document.getElementById('perfil-nombre').value.trim().toLowerCase();
+  const codigo = document.getElementById('perfil-codigo').value.trim();
+  const msg = document.getElementById('perfil-login-msg');
+  const t = tesistas.find(x => x.codigo === codigo && x.nombre.toLowerCase() === nombre);
+  if(!t){
+    msg.style.color='#A32D2D';
+    msg.textContent='Nombre o código incorrecto.';
+    return;
+  }
+  perfilTesistaId = t.id;
+  document.getElementById('perfil-login').style.display='none';
+  document.getElementById('perfil-panel').style.display='block';
+  document.getElementById('perfil-bienvenida').textContent = 'Bienvenido/a, ' + t.nombre;
+  document.getElementById('perfil-nivel').textContent = t.nivel + (t.anio ? ' · ' + t.anio : '');
+  document.getElementById('perfil-inst').value = t.inst||'';
+  document.getElementById('perfil-prov').value = t.prov||'';
+  document.getElementById('perfil-posicion').value = t.posicion_actual||'';
+  document.getElementById('perfil-email').value = t.email||'';
+  document.getElementById('perfil-url-tesis').value = t.url_tesis||'';
+  perfilCargarCampanas(t.id);
+}
+
+function perfilCerrar(){
+  perfilTesistaId = null;
+  document.getElementById('perfil-login').style.display='block';
+  document.getElementById('perfil-panel').style.display='none';
+  document.getElementById('perfil-nombre').value='';
+  document.getElementById('perfil-codigo').value='';
+  document.getElementById('perfil-login-msg').textContent='';
+}
+
+async function perfilGuardarDatos(){
+  if(!perfilTesistaId) return;
+  const msg = document.getElementById('perfil-datos-msg');
+  const {error} = await db.from('tesistas').update({
+    inst: document.getElementById('perfil-inst').value,
+    prov: document.getElementById('perfil-prov').value,
+    posicion_actual: document.getElementById('perfil-posicion').value,
+    email: document.getElementById('perfil-email').value,
+  }).eq('id', perfilTesistaId);
+  if(error){ msg.style.color='#A32D2D'; msg.textContent='Error: '+error.message; return; }
+  msg.style.color='#0F6E56'; msg.textContent='Datos guardados correctamente.';
+  await cargarTesistas();
+}
+
+async function perfilGuardarTesis(){
+  if(!perfilTesistaId) return;
+  const msg = document.getElementById('perfil-tesis-msg');
+  const urlInput = document.getElementById('perfil-url-tesis').value.trim();
+  const pdfInput = document.getElementById('perfil-pdf');
+
+  // Si hay PDF, subirlo primero
+  if(pdfInput.files.length){
+    const file = pdfInput.files[0];
+    if(file.type !== 'application/pdf'){ msg.style.color='#A32D2D'; msg.textContent='El archivo debe ser un PDF.'; return; }
+    msg.style.color='#888'; msg.textContent='Subiendo PDF...';
+    const t = tesistas.find(x=>x.id===perfilTesistaId);
+    const safeName = t.nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_');
+    const path = perfilTesistaId+'/'+safeName+'.pdf';
+    const {error: upErr} = await db.storage.from('tesis-pdfs').upload(path, file, {upsert:true});
+    if(upErr){ msg.style.color='#A32D2D'; msg.textContent='Error subiendo PDF: '+upErr.message; return; }
+    const {data:{publicUrl}} = db.storage.from('tesis-pdfs').getPublicUrl(path);
+    const {error: dbErr} = await db.from('tesistas').update({url_tesis: publicUrl}).eq('id', perfilTesistaId);
+    if(dbErr){ msg.style.color='#A32D2D'; msg.textContent='PDF subido pero error al guardar: '+dbErr.message; return; }
+    document.getElementById('perfil-url-tesis').value = publicUrl;
+    msg.style.color='#0F6E56'; msg.textContent='PDF subido y vinculado correctamente.';
+    await cargarTesistas();
+    return;
+  }
+
+  // Si hay URL manual, guardarla
+  if(urlInput){
+    const {error} = await db.from('tesistas').update({url_tesis: urlInput||null}).eq('id', perfilTesistaId);
+    if(error){ msg.style.color='#A32D2D'; msg.textContent='Error: '+error.message; return; }
+    msg.style.color='#0F6E56'; msg.textContent='Link guardado correctamente.';
+    await cargarTesistas();
+    return;
+  }
+
+  msg.style.color='#A32D2D'; msg.textContent='Ingresá una URL o seleccioná un PDF.';
+}
+
+async function perfilCargarCampanas(tesistaId){
+  // Campañas del tesista
+  const miscamp = campanas.filter(c => c.campana_tesistas && c.campana_tesistas.some(ct=>ct.tesista_id===tesistaId));
+  const cont = document.getElementById('perfil-campanas-lista');
+
+  if(!miscamp.length){
+    cont.innerHTML = '<p style="font-size:12px;color:var(--muted)">No figurás en ninguna campaña aún.</p>';
+  } else {
+    cont.innerHTML = miscamp.map(c=>{
+      const fotos = (c.campana_fotos||[]);
+      return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
+        <div style="font-weight:500;font-size:13px">${c.nombre||'Campaña '+c.anio}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px">${c.zona||''} · ${c.anio||''} · ${fotos.length} foto${fotos.length!==1?'s':''}</div>
+        <div style="font-size:11px;font-weight:500;margin-bottom:6px;color:var(--muted)">Subir fotos de esta campaña</div>
+        <input type="file" id="perfil-foto-${c.id}" multiple accept="image/*" style="font-size:11px;width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 8px;background:white;margin-bottom:6px">
+        <input id="perfil-foto-cap-${c.id}" placeholder="Descripción de las fotos (opcional)" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:11px;outline:none;background:white;margin-bottom:6px">
+        <button onclick="perfilSubirFotos('${c.id}')" style="background:#185FA5;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer">Subir fotos</button>
+        <p id="perfil-foto-msg-${c.id}" style="font-size:11px;margin-top:4px"></p>
+      </div>`;
+    }).join('');
+  }
+
+  // Selector para agregar campañas no listadas
+  const noEnrolled = new Set(miscamp.map(c=>c.id));
+  const disponibles = campanas.filter(c=>!noEnrolled.has(c.id));
+  const sel = document.getElementById('perfil-agregar-campana');
+  sel.innerHTML = '<option value="">— Seleccionar campaña —</option>' +
+    disponibles.map(c=>`<option value="${c.id}">${c.nombre||'Campaña '+c.anio} (${c.anio||'?'})</option>`).join('');
+}
+
+async function perfilAgregarCampana(){
+  if(!perfilTesistaId) return;
+  const campId = document.getElementById('perfil-agregar-campana').value;
+  const msg = document.getElementById('perfil-camp-msg');
+  if(!campId){ msg.style.color='#A32D2D'; msg.textContent='Seleccioná una campaña.'; return; }
+  const {error} = await db.from('campana_tesistas').insert({campana_id: campId, tesista_id: perfilTesistaId});
+  if(error){ msg.style.color='#A32D2D'; msg.textContent='Error: '+error.message; return; }
+  msg.style.color='#0F6E56'; msg.textContent='Campaña agregada correctamente.';
+  await cargarCampanas();
+  perfilCargarCampanas(perfilTesistaId);
+}
+
+async function perfilSubirFotos(campanaId){
+  if(!perfilTesistaId) return;
+  const files = document.getElementById('perfil-foto-'+campanaId).files;
+  const caption = document.getElementById('perfil-foto-cap-'+campanaId).value;
+  const msg = document.getElementById('perfil-foto-msg-'+campanaId);
+  if(!files.length){ msg.style.color='#A32D2D'; msg.textContent='Seleccioná al menos una foto.'; return; }
+  msg.style.color='#888'; msg.textContent='Subiendo '+files.length+' foto(s)...';
+  for(const file of files){
+    const ext = file.name.split('.').pop();
+    const path = campanaId+'/'+Date.now()+'.'+ext;
+    const {error: upErr} = await db.storage.from('campanas-fotos').upload(path, file);
+    if(upErr){ msg.style.color='#A32D2D'; msg.textContent='Error: '+upErr.message; return; }
+    const {data:{publicUrl}} = db.storage.from('campanas-fotos').getPublicUrl(path);
+    await db.from('campana_fotos').insert({campana_id: campanaId, url: publicUrl, caption});
+  }
+  msg.style.color='#0F6E56'; msg.textContent='Fotos subidas correctamente.';
+  await cargarCampanas();
+}
+
+
+async function agregarExterno(campanaId){
+  const nombre = document.getElementById('ext-nombre').value.trim();
+  const rol = document.getElementById('ext-rol').value.trim();
+  const inst = document.getElementById('ext-inst').value.trim();
+  const msg = document.getElementById('part-msg');
+  if(!nombre){ msg.style.color='#A32D2D'; msg.textContent='Ingresá el nombre del participante.'; return; }
+  // Crear o encontrar el participante externo
+  let externoId;
+  const {data: existing} = await db.from('participantes_externos')
+    .select('id').eq('nombre', nombre).maybeSingle();
+  if(existing){
+    externoId = existing.id;
+  } else {
+    const {data: nuevo, error} = await db.from('participantes_externos')
+      .insert({nombre, rol: rol||null, institucion: inst||null}).select().single();
+    if(error){ msg.style.color='#A32D2D'; msg.textContent='Error: '+error.message; return; }
+    externoId = nuevo.id;
+  }
+  // Vincular a la campaña
+  const {error: linkErr} = await db.from('campana_externos')
+    .insert({campana_id: campanaId, externo_id: externoId});
+  if(linkErr){ msg.style.color='#A32D2D'; msg.textContent='Error: '+linkErr.message; return; }
+  msg.style.color='#0F6E56'; msg.textContent='Participante agregado.';
+  document.getElementById('ext-nombre').value='';
+  document.getElementById('ext-rol').value='';
+  document.getElementById('ext-inst').value='';
+  await cargarCampanas();
+  const c = campanas.find(x=>x.id===campanaId);
+  if(!c) return;
+  // Re-fetch externos directamente para garantizar que participantes_externos venga completo
+  const {data: extData} = await db.from('campana_externos')
+    .select('externo_id, participantes_externos(id, nombre, rol, institucion)')
+    .eq('campana_id', campanaId);
+  if(extData) c.campana_externos = extData;
+  renderModalCampana(c);
+}
+
+async function quitarExterno(campanaId, externoId){
+  if(!confirm('¿Quitar este participante de la campaña?')) return;
+  await db.from('campana_externos').delete()
+    .eq('campana_id', campanaId).eq('externo_id', externoId);
+  await cargarCampanas();
+  const c = campanas.find(x=>x.id===campanaId);
+  if(!c) return;
+  const {data: extData} = await db.from('campana_externos')
+    .select('externo_id, participantes_externos(id, nombre, rol, institucion)')
+    .eq('campana_id', campanaId);
+  if(extData) c.campana_externos = extData;
+  renderModalCampana(c);
+}
+
+// ============ UBICAR CAMPAÑAS (ADMIN) ============
+let ubicarMap = null, ubicarPin = null, ubicarSelId = null;
+
+function iniciarUbicarMapa(){
+  if(ubicarMap) return; // ya inicializado
+  ubicarMap = L.map('ubicar-map', {center:[-32,-69], zoom:5});
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    {attribution:'© Esri', maxZoom:18}).addTo(ubicarMap);
+
+  // Mostrar marcadores existentes (semitransparentes)
+  campanas.forEach(c => {
+    if(c.lat && c.lng){
+      const sz=20;
+      const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}">
+        <polygon points="${sz/2},1 ${sz-1},${sz-3} 1,${sz-3}" fill="#EF9F27" stroke="#BA7517" stroke-width="1.5" opacity=".6"/>
+      </svg>`;
+      L.marker([c.lat,c.lng],{icon:L.divIcon({html:svg,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz-1]})})
+        .bindTooltip(c.nombre||'Campaña '+c.anio, {permanent:false})
+        .addTo(ubicarMap);
+    }
+  });
+
+  ubicarMap.on('click', async e => {
+    if(!ubicarSelId){ 
+      document.getElementById('ubicar-info').textContent = '← Primero seleccioná una campaña de la lista.';
+      return; 
+    }
+    const {lat, lng} = e.latlng;
+    // Colocar pin
+    if(ubicarPin) ubicarMap.removeLayer(ubicarPin);
+    const sz=28;
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}">
+      <polygon points="${sz/2},2 ${sz-2},${sz-4} 2,${sz-4}" fill="#EF9F27" stroke="#BA7517" stroke-width="1.5"/>
+      <text x="${sz/2}" y="${sz-6}" text-anchor="middle" font-size="10" fill="white" font-weight="700" font-family="Arial">C</text>
+    </svg>`;
+    const icon=L.divIcon({html:svg,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz-2]});
+    ubicarPin = L.marker([lat,lng],{icon, draggable:true}).addTo(ubicarMap);
+    ubicarPin.on('dragend', async ev => {
+      const p = ev.target.getLatLng();
+      await ubicarGuardar(ubicarSelId, p.lat, p.lng);
+    });
+
+    await ubicarGuardar(ubicarSelId, lat, lng);
+  });
+}
+
+async function ubicarGuardar(campId, lat, lng){
+  const info = document.getElementById('ubicar-info');
+  info.textContent = 'Guardando…';
+  const {error} = await db.from('campanas').update({lat, lng}).eq('id', campId);
+  if(error){ info.style.color='#A32D2D'; info.textContent='Error: '+error.message; return; }
+  // Actualizar local
+  const c = campanas.find(x=>x.id===campId);
+  if(c){ c.lat=lat; c.lng=lng; }
+  info.style.color='#0F6E56';
+  const nombre = campanas.find(x=>x.id===campId)?.nombre || campId;
+  info.textContent = `✓ "${nombre}" ubicada en ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  renderMapa();
+  renderUbicarLista();
+  // Auto-seleccionar la siguiente sin ubicación
+  const siguiente = campanas.find(c => !c.lat && !c.lng);
+  if(siguiente) ubicarSeleccionar(siguiente.id);
+}
+
+function renderUbicarLista(){
+  const cont = document.getElementById('ubicar-lista');
+  if(!cont) return;
+  const sorted = [...campanas].sort((a,b)=>(a.anio||0)-(b.anio||0));
+  cont.innerHTML = sorted.map(c => {
+    const tieneCoords = c.lat && c.lng;
+    const sel = c.id === ubicarSelId;
+    return `<div onclick="ubicarSeleccionar('${c.id}')" style="
+      padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px;
+      background:${sel?'#E6F1FB':tieneCoords?'white':'#FFF8F5'};
+      border-left:3px solid ${sel?'var(--azul)':tieneCoords?'transparent':'#F5A623'};
+    ">
+      <div style="font-weight:500;color:${tieneCoords?'inherit':'#A35A00'}">${c.nombre||'Campaña '+c.anio}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">
+        ${tieneCoords ? '✓ '+c.lat.toFixed(3)+', '+c.lng.toFixed(3) : '⚠ Sin ubicación'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function ubicarSeleccionar(campId){
+  ubicarSelId = campId;
+  renderUbicarLista();
+  const c = campanas.find(x=>x.id===campId);
+  if(!c) return;
+  const nombre = c.nombre||'Campaña '+c.anio;
+  const info = document.getElementById('ubicar-info');
+  info.style.color = 'var(--muted)';
+  if(c.lat && c.lng){
+    info.textContent = `Editando "${nombre}" — hacé clic en el mapa para mover.`;
+    ubicarMap.setView([c.lat, c.lng], 8, {animate:true});
+    // Mostrar pin actual
+    if(ubicarPin) ubicarMap.removeLayer(ubicarPin);
+    const sz=28;
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}">
+      <polygon points="${sz/2},2 ${sz-2},${sz-4} 2,${sz-4}" fill="#EF9F27" stroke="#BA7517" stroke-width="1.5"/>
+      <text x="${sz/2}" y="${sz-6}" text-anchor="middle" font-size="10" fill="white" font-weight="700" font-family="Arial">C</text>
+    </svg>`;
+    const icon=L.divIcon({html:svg,className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz-2]});
+    ubicarPin = L.marker([c.lat,c.lng],{icon,draggable:true}).addTo(ubicarMap);
+    ubicarPin.on('dragend', async ev => {
+      const p = ev.target.getLatLng();
+      await ubicarGuardar(campId, p.lat, p.lng);
+    });
+  } else {
+    info.textContent = `"${nombre}" sin ubicación — hacé clic en el mapa para asignarla.`;
+  }
+}
+
+// ============ BÚSQUEDA EN MAPA ============
+let mapaSearchTimeout = null;
+function buscarEnMapa(q){
+  const resDiv = document.getElementById('mapa-search-results');
+  clearTimeout(mapaSearchTimeout);
+  if(!q.trim()){ resDiv.innerHTML=''; return; }
+  mapaSearchTimeout = setTimeout(()=>{
+    const ql = q.toLowerCase();
+    const resTesistas = tesistas.filter(t=>t.lat&&t.lng&&[t.nombre,t.tema,t.inst].some(v=>v&&v.toLowerCase().includes(ql))).slice(0,5);
+    const resCampanas = campanas.filter(c=>c.lat&&c.lng&&[c.nombre,c.zona,String(c.anio||'')].some(v=>v&&v.toLowerCase().includes(ql))).slice(0,5);
+    const items = [
+      ...resTesistas.map(t=>({label:`👤 ${t.nombre} · ${t.nivel}`, lat:t.lat, lng:t.lng, tipo:'tesista', id:t.id})),
+      ...resCampanas.map(c=>({label:`⛺ ${c.nombre||'Campaña '+c.anio} · ${c.zona||''}`, lat:c.lat, lng:c.lng, tipo:'campana', id:c.id})),
+    ];
+    if(!items.length){ resDiv.innerHTML=`<div style="position:absolute;top:4px;left:0;right:0;background:white;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);z-index:1000">Sin resultados con coordenadas para "${q}"</div>`; return; }
+    resDiv.innerHTML=`<div style="position:absolute;top:4px;left:0;right:0;background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;z-index:1000;box-shadow:0 4px 16px rgba(0,0,0,.12)">
+      ${items.map(it=>`<div onclick="mapaIrA(${it.lat},${it.lng},'${it.tipo}','${it.id}')"
+        style="padding:9px 14px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
+        onmouseover="this.style.background='#f0f4fb'" onmouseout="this.style.background='white'">
+        ${it.label}
+      </div>`).join('')}
+    </div>`;
+  }, 220);
+}
+
+function mapaIrA(lat, lng, tipo, id){
+  document.getElementById('mapa-search-results').innerHTML='';
+  document.getElementById('mapa-search').value='';
+  leafMap.setView([lat,lng], 10, {animate:true});
+  setTimeout(()=>{
+    markersLayer.eachLayer(layer=>{
+      const p=layer.getLatLng();
+      if(Math.hypot(p.lat-lat, p.lng-lng)<0.3) layer.openPopup();
+    });
+  }, 400);
+}
+
+// ============ START ============
+init();
+</script>
+</body>
+</html>
