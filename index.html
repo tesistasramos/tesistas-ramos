@@ -561,7 +561,7 @@ function renderMapa(){
       const g=[t];vis.add(i);
       validos.forEach((t2,j)=>{
         if(i===j||vis.has(j)) return;
-        if(Math.hypot(t.lat-t2.lat,t.lng-t2.lng)<0.18){g.push(t2);vis.add(j);}
+        if(Math.hypot(t.lat-t2.lat,t.lng-t2.lng)<0.01){g.push(t2);vis.add(j);}
       });
       grupos.push(g);
     });
